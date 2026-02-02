@@ -45,16 +45,45 @@ install_dependencies() {
 
     case $DISTRO in
         ubuntu|debian)
-            apt-get update -qq
-            apt-get install -y -qq \
-                docker.io \
-                docker-compose \
+            # Atualizar e corrigir pacotes quebrados
+            apt-get update
+            apt-get install -f -y
+
+            # Instalar dependências básicas primeiro
+            apt-get install -y \
+                ca-certificates \
+                curl \
+                gnupg \
+                lsb-release \
                 ufw \
                 iptables \
                 net-tools \
-                curl \
-                openssl \
-                ca-certificates
+                openssl
+
+            # Instalar Docker oficial
+            echo -e "${YELLOW}[INFO]${NC} Instalando Docker..."
+
+            # Remover versões antigas
+            apt-get remove -y docker docker-engine docker.io containerd runc 2>/dev/null || true
+
+            # Adicionar repositório Docker
+            mkdir -p /etc/apt/keyrings
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg 2>/dev/null || \
+            curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+            chmod a+r /etc/apt/keyrings/docker.gpg
+
+            echo \
+              "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/$DISTRO \
+              $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+            # Instalar Docker
+            apt-get update
+            apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+            # Iniciar Docker
+            systemctl start docker
+            systemctl enable docker
             ;;
         centos|rhel|fedora)
             yum install -y -q \
