@@ -1,3 +1,4 @@
+// Package config centraliza o carregamento de variáveis de ambiente usadas pelo servidor.
 package config
 
 import (
@@ -6,14 +7,14 @@ import (
 	"time"
 )
 
-// Config contém todas as configurações da aplicação
+// Config contém todas as configurações da aplicação.
 type Config struct {
 	Server ServerConfig
 	Client ClientConfig
 	TLS    TLSConfig
 }
 
-// ServerConfig configurações do servidor
+// ServerConfig define os parâmetros de exposição do servidor.
 type ServerConfig struct {
 	Address     string
 	Port        string
@@ -21,7 +22,7 @@ type ServerConfig struct {
 	LogLevel    string
 }
 
-// ClientConfig configurações do cliente
+// ClientConfig agrupa as configurações específicas do cliente.
 type ClientConfig struct {
 	ServerAddress  string
 	ClientID       string
@@ -32,7 +33,7 @@ type ClientConfig struct {
 	Version        string
 }
 
-// TLSConfig configurações de segurança
+// TLSConfig define os caminhos e o controle de TLS.
 type TLSConfig struct {
 	Enabled  bool
 	CertFile string
@@ -40,7 +41,7 @@ type TLSConfig struct {
 	CAFile   string
 }
 
-// LoadServerConfig carrega configurações do servidor
+// LoadServerConfig carrega configurações do servidor a partir do ambiente.
 func LoadServerConfig() *ServerConfig {
 	return &ServerConfig{
 		Address:     getEnv("SERVER_ADDRESS", "0.0.0.0"),
@@ -50,7 +51,7 @@ func LoadServerConfig() *ServerConfig {
 	}
 }
 
-// LoadClientConfig carrega configurações do cliente
+// LoadClientConfig carrega configurações do cliente a partir do ambiente.
 func LoadClientConfig() *ClientConfig {
 	return &ClientConfig{
 		ServerAddress:  getEnv("SERVER_ADDRESS", "localhost:50051"),
@@ -63,7 +64,7 @@ func LoadClientConfig() *ClientConfig {
 	}
 }
 
-// LoadTLSConfig carrega configurações TLS
+// LoadTLSConfig carrega configurações TLS a partir do ambiente.
 func LoadTLSConfig() *TLSConfig {
 	return &TLSConfig{
 		Enabled:  getBoolEnv("TLS_ENABLED", true),
@@ -73,7 +74,7 @@ func LoadTLSConfig() *TLSConfig {
 	}
 }
 
-// Funções auxiliares
+// Funções auxiliares.
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
