@@ -277,6 +277,7 @@ voidprobe/
 - [Segurança](SECURITY.md)
 - [Diretrizes](PROJECT_GUIDELINES.md)
 - [Documentação do Código](CODE_DOCUMENTATION.md)
+- [VoidProbeCDN (operar atrás de CDN)](VOIDPROBE_CDN.md)
 
 ---
 
