@@ -45,7 +45,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
     -ldflags="-s -w -X main.Version=1.0.0 -X main.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     -trimpath \
     -o /server \
-    ./cmd/main.go
+    ./cmd
 
 # Verificar se o binário foi criado corretamente
 RUN test -f /server && chmod +x /server
