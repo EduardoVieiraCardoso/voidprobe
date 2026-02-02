@@ -29,6 +29,11 @@ RUN apk add --no-cache \
 
 # Copiar definições de dependências
 COPY go.mod go.sum ./
+
+# Garantir que go.sum está completo
+RUN go mod tidy -e 2>&1 || true
+
+# Download e verificação de dependências
 RUN go mod download && go mod verify
 
 # Copiar código fonte
