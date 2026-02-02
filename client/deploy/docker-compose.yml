@@ -1,0 +1,124 @@
+version: '3.8'
+
+# ==============================================================================
+# VoidProbe Client - Docker Compose
+# ==============================================================================
+#
+# Configuração do cliente de túnel reverso
+#
+# Funcionalidades:
+# - Conecta ao servidor remoto
+# - Mantém túnel persistente com reconexão automática
+# - Tunela serviços locais para o servidor
+# - Network mode "host" para acessar serviços locais
+
+services:
+  client:
+    build:
+      context: ../../
+      dockerfile: deploy/cliente/Dockerfile
+    image: voidprobe-client:latest
+    container_name: voidprobe-client
+    hostname: voidprobe-client
+
+    # Restart automático com delay
+    restart: unless-stopped
+
+    # IMPORTANTE: Network mode "host" permite acesso a serviços locais
+    # Isso é necessário para tunelar serviços como SSH, web servers, etc.
+    network_mode: "host"
+
+    # Variáveis de ambiente
+    environment:
+      # Servidor remoto (OBRIGATÓRIO)
+      - SERVER_ADDRESS=${SERVER_ADDRESS:?SERVER_ADDRESS não definido}
+
+      # Autenticação (OBRIGATÓRIO)
+      - AUTH_TOKEN=${AUTH_TOKEN:?AUTH_TOKEN não definido}
+
+      # Identificação deste cliente
+      - CLIENT_ID=${CLIENT_ID:-client-default}
+
+      # Serviço local a ser tunelado
+      # Exemplos:
+      #   - localhost:22 (SSH)
+      #   - localhost:8080 (Web)
+      #   - localhost:5432 (PostgreSQL)
+      - TARGET_SERVICE=${TARGET_SERVICE:-localhost:22}
+
+      # TLS/Segurança
+      - TLS_ENABLED=${TLS_ENABLED:-true}
+
+      # Reconexão
+      - RECONNECT_DELAY=${RECONNECT_DELAY:-5s}
+      - MAX_RETRIES=${MAX_RETRIES:-100}
+
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+
+    # Volumes
+    volumes:
+      # Logs (leitura/escrita)
+      - ./logs:/logs
+
+    # Limites de recursos
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+    # Logging estruturado
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=voidprobe-client"
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "client"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    # Security
+    security_opt:
+      - no-new-privileges:true
+
+    # Capabilities (mínimas necessárias)
+    cap_drop:
+      - ALL
+
+# ==============================================================================
+# Notas Importantes
+# ==============================================================================
+#
+# 1. Network Mode "host":
+#    - Permite acesso direto aos serviços locais
+#    - Necessário para tunelar localhost:22, localhost:8080, etc.
+#    - Não isola rede do container
+#
+# 2. Variáveis de Ambiente:
+#    - Defina em arquivo .env na mesma pasta
+#    - Ou use: export VAR=value antes de docker-compose up
+#
+# 3. Reconexão Automática:
+#    - Cliente reconecta automaticamente se perder conexão
+#    - MAX_RETRIES controla quantas tentativas (100 = ~8 horas com delay de 5s)
+#    - restart: unless-stopped reinicia o container se ele crashar
+#
+# 4. Serviço Alvo:
+#    - Deve estar rodando ANTES do cliente
+#    - Use "localhost" para serviços na máquina host
+#    - Teste com: nc -zv localhost 22
+#
+# 5. Logs:
+#    - Logs do aplicativo: ./logs/
+#    - Logs do Docker: docker logs voidprobe-client
+#    - Rotação automática configurada (10m por arquivo, máx 3 arquivos)

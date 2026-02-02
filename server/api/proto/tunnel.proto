@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package tunnel;
+
+option go_package = "github.com/seu-usuario/voidprobe/api/proto";
+
+// RemoteTunnel - Serviço de túnel seguro para administração remota
+// Este serviço permite conexões reversas autorizadas para suporte técnico
+service RemoteTunnel {
+  // TunnelStream estabelece um túnel bidirecional multiplexado
+  rpc TunnelStream(stream Chunk) returns (stream Chunk);
+
+  // HealthCheck verifica o status da conexão
+  rpc HealthCheck(HealthRequest) returns (HealthResponse);
+}
+
+// Chunk representa um pacote de dados no túnel
+message Chunk {
+  bytes data = 1;
+}
+
+// HealthRequest para verificação de status
+message HealthRequest {
+  string client_id = 1;
+}
+
+// HealthResponse retorna informações do cliente
+message HealthResponse {
+  string status = 1;
+  string version = 2;
+  int64 uptime_seconds = 3;
+}
