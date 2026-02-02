@@ -47,7 +47,7 @@ install_dependencies() {
     case $DISTRO in
         ubuntu|debian)
             # Atualizar e corrigir pacotes quebrados
-            apt-get update
+            apt-get update -y
             apt-get install -f -y
 
             # Instalar dependências básicas
@@ -76,7 +76,7 @@ install_dependencies() {
               $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
 
             # Instalar Docker
-            apt-get update
+            apt-get update -y
             apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
             # Iniciar Docker
