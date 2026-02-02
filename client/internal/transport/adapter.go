@@ -16,10 +16,12 @@ type GrpcStream interface {
 // Adapter adapta um stream gRPC para io.ReadWriteCloser
 // necessário para integração com yamux
 type Adapter struct {
-	Stream GrpcStream
-	buffer []byte
-	mu     sync.Mutex
-	closed bool
+	Stream   GrpcStream
+	buffer   []byte
+	readMu   sync.Mutex // Mutex separado para leitura
+	writeMu  sync.Mutex // Mutex separado para escrita
+	closed   bool
+	closedMu sync.RWMutex
 }
 
 // NewAdapter cria um novo adaptador
@@ -30,12 +32,26 @@ func NewAdapter(stream GrpcStream) *Adapter {
 	}
 }
 
+// isClosed verifica se o adapter está fechado
+func (a *Adapter) isClosed() bool {
+	a.closedMu.RLock()
+	defer a.closedMu.RUnlock()
+	return a.closed
+}
+
+// setClosed marca o adapter como fechado
+func (a *Adapter) setClosed() {
+	a.closedMu.Lock()
+	defer a.closedMu.Unlock()
+	a.closed = true
+}
+
 // Read implementa io.Reader
 func (a *Adapter) Read(p []byte) (int, error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.readMu.Lock()
+	defer a.readMu.Unlock()
 
-	if a.closed {
+	if a.isClosed() {
 		return 0, io.EOF
 	}
 
@@ -46,10 +62,10 @@ func (a *Adapter) Read(p []byte) (int, error) {
 		return n, nil
 	}
 
-	// Recebe novos dados do stream
+	// Recebe novos dados do stream (NÃO bloqueia escrita)
 	msg, err := a.Stream.Recv()
 	if err != nil {
-		a.closed = true
+		a.setClosed()
 		return 0, err
 	}
 
@@ -67,10 +83,10 @@ func (a *Adapter) Read(p []byte) (int, error) {
 
 // Write implementa io.Writer
 func (a *Adapter) Write(p []byte) (int, error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.writeMu.Lock()
+	defer a.writeMu.Unlock()
 
-	if a.closed {
+	if a.isClosed() {
 		return 0, io.ErrClosedPipe
 	}
 
@@ -78,10 +94,10 @@ func (a *Adapter) Write(p []byte) (int, error) {
 	data := make([]byte, len(p))
 	copy(data, p)
 
-	// Envia pelo stream
+	// Envia pelo stream (NÃO bloqueia leitura)
 	err := a.Stream.Send(&pb.Chunk{Data: data})
 	if err != nil {
-		a.closed = true
+		a.setClosed()
 		return 0, err
 	}
 
@@ -90,11 +106,11 @@ func (a *Adapter) Write(p []byte) (int, error) {
 
 // Close implementa io.Closer
 func (a *Adapter) Close() error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.setClosed()
 
-	a.closed = true
+	a.readMu.Lock()
 	a.buffer = nil
+	a.readMu.Unlock()
 
 	return nil
 }
