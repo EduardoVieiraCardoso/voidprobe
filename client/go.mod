@@ -1,6 +1,6 @@
 module github.com/voidprobe/client
 
-go 1.21
+go 1.23
 
 require (
 	github.com/hashicorp/yamux v0.1.1

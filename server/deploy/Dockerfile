@@ -11,7 +11,7 @@
 # ==============================================================================
 # Build Stage
 # ==============================================================================
-FROM golang:1.21-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
 LABEL maintainer="security@voidprobe.io"
 LABEL description="VoidProbe Tunnel Server - Build Stage"
