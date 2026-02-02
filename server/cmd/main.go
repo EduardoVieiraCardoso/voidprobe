@@ -116,7 +116,16 @@ func (s *server) TunnelStream(stream pb.RemoteTunnel_TunnelStreamServer) error {
 	log.Println("New client connected")
 
 	adapter := transport.NewAdapter(stream)
-	session, err := yamux.Server(adapter, nil)
+
+	// Configuração yamux com keepalive mais longo
+	yamuxConfig := yamux.DefaultConfig()
+	yamuxConfig.EnableKeepAlive = true
+	yamuxConfig.KeepAliveInterval = 60 * time.Second
+	yamuxConfig.ConnectionWriteTimeout = 60 * time.Second
+	yamuxConfig.StreamCloseTimeout = 5 * time.Minute
+	yamuxConfig.StreamOpenTimeout = 60 * time.Second
+
+	session, err := yamux.Server(adapter, yamuxConfig)
 	if err != nil {
 		log.Printf("Failed to create yamux session: %v", err)
 		return err

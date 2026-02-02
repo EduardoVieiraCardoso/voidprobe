@@ -131,7 +131,16 @@ func connectAndServe(
 	log.Println("Tunnel established")
 
 	adapter := transport.NewAdapter(stream)
-	session, err := yamux.Client(adapter, nil)
+
+	// Configuração yamux com keepalive mais longo
+	yamuxConfig := yamux.DefaultConfig()
+	yamuxConfig.EnableKeepAlive = true
+	yamuxConfig.KeepAliveInterval = 60 * time.Second
+	yamuxConfig.ConnectionWriteTimeout = 60 * time.Second
+	yamuxConfig.StreamCloseTimeout = 5 * time.Minute
+	yamuxConfig.StreamOpenTimeout = 60 * time.Second
+
+	session, err := yamux.Client(adapter, yamuxConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create yamux session: %w", err)
 	}
