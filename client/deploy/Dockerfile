@@ -39,6 +39,15 @@ RUN go mod download && go mod verify
 # Copiar código fonte
 COPY . .
 
+# Gerar código Go a partir dos arquivos proto
+RUN if [ -d "api/proto" ] && [ -f "api/proto/tunnel.proto" ]; then \
+        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
+        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest && \
+        protoc --go_out=. --go_opt=paths=source_relative \
+               --go-grpc_out=. --go-grpc_opt=paths=source_relative \
+               api/proto/tunnel.proto; \
+    fi
+
 # Build do cliente com otimizações
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
     go build \
