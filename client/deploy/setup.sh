@@ -225,7 +225,7 @@ copy_project_files() {
 
     # Detectar onde o script está sendo executado
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    CLIENT_DIR="$(cd "$SCRIPT_DIR/.." PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)" pwd)"
+    CLIENT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
     CONFIG_DIR="/opt/voidprobe-client"
 
