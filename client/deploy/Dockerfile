@@ -41,8 +41,8 @@ COPY . .
 
 # Gerar código Go a partir dos arquivos proto
 RUN if [ -d "api/proto" ] && [ -f "api/proto/tunnel.proto" ]; then \
-        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
-        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest && \
+        go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.32.0 && \
+        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0 && \
         protoc --go_out=. --go_opt=paths=source_relative \
                --go-grpc_out=. --go-grpc_opt=paths=source_relative \
                api/proto/tunnel.proto; \
