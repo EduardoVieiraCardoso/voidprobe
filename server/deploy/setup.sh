@@ -306,13 +306,12 @@ build_docker_image() {
 
     cd "$CONFIG_DIR"
 
-    # Build da imagem
-    docker build -t voidprobe-server:latest -f Dockerfile . 2>&1 | grep -v "WARNING"
-
-    if [ $? -eq 0 ]; then
+    # Build da imagem (capturar exit code corretamente)
+    if docker build -t voidprobe-server:latest -f Dockerfile . ; then
         echo -e "${GREEN}[OK]${NC} Imagem Docker criada com sucesso"
     else
         echo -e "${RED}[ERRO]${NC} Falha ao criar imagem Docker"
+        echo -e "${RED}[DICA]${NC} Verifique se fez 'git pull' para obter os go.sum corretos"
         exit 1
     fi
 }
