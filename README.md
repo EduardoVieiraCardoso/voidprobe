@@ -90,6 +90,35 @@ VoidProbe permite acessar **serviços em máquinas atrás de NAT/firewall** sem 
 4. **Servidor** abre porta local (2222) para administradores
 5. **Admin** conecta na porta 2222 → tráfego vai pelo túnel → chega no serviço do cliente
 
+### O Que é Yamux?
+
+**Yamux** (Yet Another Multiplexer) é uma biblioteca da HashiCorp que permite **múltiplas conexões virtuais** sobre uma única conexão de rede.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    CONEXÃO ÚNICA gRPC/TLS                       │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐               │
+│  │  Stream 1   │ │  Stream 2   │ │  Stream 3   │  ...          │
+│  │  (SSH #1)   │ │  (SSH #2)   │ │  (SSH #3)   │               │
+│  └─────────────┘ └─────────────┘ └─────────────┘               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Por que usar Yamux?**
+
+| Problema | Solução Yamux |
+|----------|---------------|
+| Uma conexão = um túnel | Múltiplos túneis virtuais |
+| Admin #2 espera Admin #1 | Todos simultâneos |
+| Conexões separadas = overhead | Uma conexão, múltiplos streams |
+| Reconexão afeta todos | Streams independentes |
+
+**Funcionalidades:**
+- 🔀 **Multiplexação**: Vários admins conectam ao mesmo tempo
+- 💓 **Keepalive**: Detecta se a conexão caiu
+- 🔄 **Backpressure**: Controle de fluxo automático
+- 🪶 **Leve**: Overhead mínimo (headers de 12 bytes)
+
 ---
 
 ## 🚀 Instalação Rápida
