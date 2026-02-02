@@ -1,3 +1,4 @@
+// Package security implementa autenticação e interceptores para o servidor gRPC.
 package security
 
 import (
@@ -19,12 +20,12 @@ var (
 	ErrInvalidFormat = errors.New("invalid authorization format")
 )
 
-// TokenValidator valida tokens de autenticação
+// TokenValidator valida tokens de autenticação.
 type TokenValidator struct {
 	validTokens map[string]bool
 }
 
-// NewTokenValidator cria um novo validador
+// NewTokenValidator cria um novo validador.
 func NewTokenValidator(tokens []string) *TokenValidator {
 	validator := &TokenValidator{
 		validTokens: make(map[string]bool),
@@ -35,7 +36,7 @@ func NewTokenValidator(tokens []string) *TokenValidator {
 	return validator
 }
 
-// Validate verifica se o token é válido usando comparação de tempo constante
+// Validate verifica se o token é válido usando comparação de tempo constante.
 func (tv *TokenValidator) Validate(token string) error {
 	if token == "" {
 		return ErrMissingAuth
@@ -50,7 +51,7 @@ func (tv *TokenValidator) Validate(token string) error {
 	return ErrInvalidToken
 }
 
-// UnaryInterceptor cria um interceptor para chamadas unárias
+// UnaryInterceptor cria um interceptor para chamadas unárias.
 func (tv *TokenValidator) UnaryInterceptor() grpc.UnaryServerInterceptor {
 	return func(
 		ctx context.Context,
@@ -66,7 +67,7 @@ func (tv *TokenValidator) UnaryInterceptor() grpc.UnaryServerInterceptor {
 	}
 }
 
-// StreamInterceptor cria um interceptor para chamadas de stream
+// StreamInterceptor cria um interceptor para chamadas de stream.
 func (tv *TokenValidator) StreamInterceptor() grpc.StreamServerInterceptor {
 	return func(
 		srv interface{},
@@ -82,7 +83,7 @@ func (tv *TokenValidator) StreamInterceptor() grpc.StreamServerInterceptor {
 	}
 }
 
-// authenticate extrai e valida o token do contexto
+// authenticate extrai e valida o token do contexto.
 func (tv *TokenValidator) authenticate(ctx context.Context) error {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
@@ -104,7 +105,7 @@ func (tv *TokenValidator) authenticate(ctx context.Context) error {
 	return tv.Validate(parts[1])
 }
 
-// ClientAuthInterceptor adiciona token nas chamadas do cliente
+// ClientAuthInterceptor adiciona token nas chamadas do cliente.
 type ClientAuthInterceptor struct {
 	token string
 }

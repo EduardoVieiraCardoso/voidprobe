@@ -22,12 +22,14 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
+// server implementa o serviço gRPC e armazena as sessões ativas.
 type server struct {
 	pb.UnimplementedRemoteTunnelServer
 	sessions sync.Map
 	config   *config.ServerConfig
 }
 
+// main inicializa o servidor gRPC e aguarda conexões de clientes autenticados.
 func main() {
 	log.Println("=== VoidProbe Server ===")
 	log.Println("Remote Administration Server")
@@ -111,7 +113,7 @@ func main() {
 	}
 }
 
-// TunnelStream implementa o serviço de túnel
+// TunnelStream implementa o serviço de túnel e expõe a porta de administração.
 func (s *server) TunnelStream(stream pb.RemoteTunnel_TunnelStreamServer) error {
 	log.Println("New client connected")
 
@@ -177,7 +179,7 @@ func (s *server) TunnelStream(stream pb.RemoteTunnel_TunnelStreamServer) error {
 	}
 }
 
-// HealthCheck implementa verificação de status
+// HealthCheck implementa verificação de status.
 func (s *server) HealthCheck(ctx context.Context, req *pb.HealthRequest) (*pb.HealthResponse, error) {
 	return &pb.HealthResponse{
 		Status:        "healthy",
@@ -186,6 +188,7 @@ func (s *server) HealthCheck(ctx context.Context, req *pb.HealthRequest) (*pb.He
 	}, nil
 }
 
+// proxyConnection encaminha tráfego bidirecional entre admin e cliente.
 func proxyConnection(local, remote net.Conn) {
 	defer local.Close()
 	defer remote.Close()

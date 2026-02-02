@@ -22,6 +22,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+// main inicializa o cliente, conecta ao servidor e aguarda conexões de admin.
 func main() {
 	log.Println("=== VoidProbe Client ===")
 	log.Println("Remote Administration Client")
@@ -97,6 +98,7 @@ func main() {
 	log.Println("Client stopped")
 }
 
+// connectAndServe estabelece o túnel yamux e aceita conexões remotas.
 func connectAndServe(
 	ctx context.Context,
 	cfg *config.ClientConfig,
@@ -164,6 +166,7 @@ func connectAndServe(
 	}
 }
 
+// handleStream conecta ao serviço local e faz o proxy bidirecional.
 func handleStream(remote net.Conn, targetService string) {
 	defer remote.Close()
 

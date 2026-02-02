@@ -1,3 +1,4 @@
+// Package transport adapta streams gRPC para conexões compatíveis com yamux.
 package transport
 
 import (
@@ -7,14 +8,14 @@ import (
 	pb "github.com/voidprobe/client/api/proto"
 )
 
-// GrpcStream interface para o stream gRPC
+// GrpcStream interface para o stream gRPC.
 type GrpcStream interface {
 	Send(*pb.Chunk) error
 	Recv() (*pb.Chunk, error)
 }
 
-// Adapter adapta um stream gRPC para io.ReadWriteCloser
-// necessário para integração com yamux
+// Adapter adapta um stream gRPC para io.ReadWriteCloser,
+// necessário para integração com yamux.
 type Adapter struct {
 	Stream   GrpcStream
 	buffer   []byte
@@ -24,7 +25,7 @@ type Adapter struct {
 	closedMu sync.RWMutex
 }
 
-// NewAdapter cria um novo adaptador
+// NewAdapter cria um novo adaptador.
 func NewAdapter(stream GrpcStream) *Adapter {
 	return &Adapter{
 		Stream: stream,
@@ -32,21 +33,21 @@ func NewAdapter(stream GrpcStream) *Adapter {
 	}
 }
 
-// isClosed verifica se o adapter está fechado
+// isClosed verifica se o adapter está fechado.
 func (a *Adapter) isClosed() bool {
 	a.closedMu.RLock()
 	defer a.closedMu.RUnlock()
 	return a.closed
 }
 
-// setClosed marca o adapter como fechado
+// setClosed marca o adapter como fechado.
 func (a *Adapter) setClosed() {
 	a.closedMu.Lock()
 	defer a.closedMu.Unlock()
 	a.closed = true
 }
 
-// Read implementa io.Reader
+// Read implementa io.Reader.
 func (a *Adapter) Read(p []byte) (int, error) {
 	a.readMu.Lock()
 	defer a.readMu.Unlock()
@@ -81,7 +82,7 @@ func (a *Adapter) Read(p []byte) (int, error) {
 	return n, nil
 }
 
-// Write implementa io.Writer
+// Write implementa io.Writer.
 func (a *Adapter) Write(p []byte) (int, error) {
 	a.writeMu.Lock()
 	defer a.writeMu.Unlock()
@@ -104,7 +105,7 @@ func (a *Adapter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// Close implementa io.Closer
+// Close implementa io.Closer.
 func (a *Adapter) Close() error {
 	a.setClosed()
 

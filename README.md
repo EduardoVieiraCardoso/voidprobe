@@ -164,6 +164,50 @@ ssh -p 2222 usuario@IP_DO_SERVIDOR
 
 ---
 
+## 🛠️ Build e Execução Manual (Sem Scripts)
+
+### Servidor
+
+```bash
+cd server
+go build -o voidprobe-server ./cmd
+
+export AUTH_TOKEN="seu-token"
+export SERVER_ADDRESS="0.0.0.0"
+export SERVER_PORT="50051"
+export TLS_ENABLED="true"
+
+./voidprobe-server
+```
+
+### Cliente
+
+```bash
+cd client
+go build -o voidprobe-client ./cmd
+
+export AUTH_TOKEN="seu-token"
+export SERVER_ADDRESS="seuservidor.com:50051"
+export TARGET_SERVICE="localhost:22"
+export TLS_ENABLED="true"
+
+./voidprobe-client
+```
+
+> Dica: use `TLS_ENABLED=false` apenas para testes locais.
+
+---
+
+## 🧭 Portas e Protocolos
+
+| Porta | Papel | Protocolo |
+|------:|-------|-----------|
+| 50051 | Túnel cliente ↔ servidor | gRPC/TLS |
+| 2222 | Administração remota | TCP (SSH/qualquer) |
+| 9090 | Métricas (opcional) | HTTP |
+
+---
+
 ## 🔐 Segurança
 
 - **Autenticação**: Token SHA-256 de 256 bits
@@ -232,6 +276,30 @@ voidprobe/
 - [Estrutura do Projeto](STRUCTURE.md)
 - [Segurança](SECURITY.md)
 - [Diretrizes](PROJECT_GUIDELINES.md)
+- [Documentação do Código](CODE_DOCUMENTATION.md)
+- [VoidProbeCDN (operar atrás de CDN)](VOIDPROBE_CDN.md)
+
+---
+
+## 🧪 Testes e Qualidade
+
+```bash
+cd server
+go test ./...
+
+cd ../client
+go test ./...
+```
+
+---
+
+## 🧯 Troubleshooting Rápido
+
+| Sintoma | Causa provável | Ação |
+|--------|----------------|------|
+| `AUTH_TOKEN environment variable is required` | Token não configurado | Exportar `AUTH_TOKEN` no servidor e cliente |
+| Cliente conecta e cai | TLS inválido ou token incorreto | Validar certificados ou usar `TLS_ENABLED=false` em teste |
+| Admin não conecta na porta 2222 | Porta bloqueada por firewall | Liberar `tcp/2222` no servidor |
 
 ---
 
