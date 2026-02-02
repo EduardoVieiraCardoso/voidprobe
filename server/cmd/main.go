@@ -135,7 +135,7 @@ func (s *server) TunnelStream(stream pb.RemoteTunnel_TunnelStreamServer) error {
 	log.Println("Yamux session established")
 
 	// Listener local para administradores
-	localPort := "127.0.0.1:2222"
+	localPort := "0.0.0.0:2222"
 	listener, err := net.Listen("tcp", localPort)
 	if err != nil {
 		log.Printf("Failed to create local listener: %v", err)
