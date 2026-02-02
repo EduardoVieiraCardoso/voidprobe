@@ -273,20 +273,24 @@ copy_project_files() {
 
     # Detectar onde o script está sendo executado
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+    SERVER_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
     CONFIG_DIR="/opt/voidprobe"
 
-    # Verificar se estamos no repositório
-    if [ ! -f "$PROJECT_ROOT/cmd/main.go" ]; then
+    # Verificar se estamos no diretório do servidor
+    if [ ! -f "$SERVER_DIR/cmd/main.go" ]; then
         echo -e "${RED}[ERRO]${NC} Arquivos do projeto não encontrados!"
+        echo "Diretório atual: $SERVER_DIR"
         echo "Execute este script a partir do diretório: ~/voidprobe/server/deploy/"
         exit 1
     fi
 
+    # Criar diretório de destino
+    mkdir -p "$CONFIG_DIR"
+
     # Copiar arquivos do servidor para /opt/voidprobe
     echo "Copiando arquivos do servidor..."
-    cp -r "$PROJECT_ROOT"/* "$CONFIG_DIR/"
+    cp -r "$SERVER_DIR"/* "$CONFIG_DIR/"
 
     # Copiar Dockerfile
     cp "$SCRIPT_DIR/Dockerfile" "$CONFIG_DIR/"

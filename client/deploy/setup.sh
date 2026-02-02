@@ -225,12 +225,12 @@ copy_project_files() {
 
     # Detectar onde o script está sendo executado
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+    CLIENT_DIR="$(cd "$SCRIPT_DIR/.." PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)" pwd)"
 
     CONFIG_DIR="/opt/voidprobe-client"
 
     # Verificar se estamos no repositório
-    if [ ! -f "$PROJECT_ROOT/cmd/main.go" ]; then
+    if [ ! -f "$CLIENT_DIR/cmd/main.go" ]; then
         echo -e "${RED}[ERRO]${NC} Arquivos do projeto não encontrados!"
         echo "Execute este script a partir do diretório: ~/voidprobe/client/deploy/"
         exit 1
@@ -238,7 +238,7 @@ copy_project_files() {
 
     # Copiar arquivos do cliente para /opt/voidprobe-client
     echo "Copiando arquivos do cliente..."
-    cp -r "$PROJECT_ROOT"/* "$CONFIG_DIR/"
+    cp -r "$CLIENT_DIR"/* "$CONFIG_DIR/"
 
     # Copiar Dockerfile
     cp "$SCRIPT_DIR/Dockerfile" "$CONFIG_DIR/"
