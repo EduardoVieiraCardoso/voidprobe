@@ -185,7 +185,7 @@ EOF
 
 # Função para criar docker-compose
 create_docker_compose() {
-    echo -e "${YELLOW}[4/5]${NC} Criando configuração Docker..."
+    echo -e "${YELLOW}[4/7]${NC} Criando configuração Docker..."
 
     CONFIG_DIR="/opt/voidprobe-client"
 
@@ -219,9 +219,55 @@ EOF
     echo -e "${GREEN}[OK]${NC} Docker Compose configurado"
 }
 
+# Função para copiar arquivos do projeto
+copy_project_files() {
+    echo -e "${YELLOW}[5/7]${NC} Copiando arquivos do projeto..."
+
+    # Detectar onde o script está sendo executado
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+    CONFIG_DIR="/opt/voidprobe-client"
+
+    # Verificar se estamos no repositório
+    if [ ! -f "$PROJECT_ROOT/cmd/main.go" ]; then
+        echo -e "${RED}[ERRO]${NC} Arquivos do projeto não encontrados!"
+        echo "Execute este script a partir do diretório: ~/voidprobe/client/deploy/"
+        exit 1
+    fi
+
+    # Copiar arquivos do cliente para /opt/voidprobe-client
+    echo "Copiando arquivos do cliente..."
+    cp -r "$PROJECT_ROOT"/* "$CONFIG_DIR/"
+
+    # Copiar Dockerfile
+    cp "$SCRIPT_DIR/Dockerfile" "$CONFIG_DIR/"
+
+    echo -e "${GREEN}[OK]${NC} Arquivos copiados para: $CONFIG_DIR"
+}
+
+# Função para fazer build da imagem Docker
+build_docker_image() {
+    echo -e "${YELLOW}[6/7]${NC} Fazendo build da imagem Docker..."
+
+    CONFIG_DIR="/opt/voidprobe-client"
+
+    cd "$CONFIG_DIR"
+
+    # Build da imagem
+    docker build -t voidprobe-client:latest -f Dockerfile . 2>&1 | grep -v "WARNING"
+
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}[OK]${NC} Imagem Docker criada com sucesso"
+    else
+        echo -e "${RED}[ERRO]${NC} Falha ao criar imagem Docker"
+        exit 1
+    fi
+}
+
 # Função para criar serviço systemd
 create_systemd_service() {
-    echo -e "${YELLOW}[5/5]${NC} Criando serviço systemd..."
+    echo -e "${YELLOW}[7/7]${NC} Criando serviço systemd..."
 
     cat > /etc/systemd/system/voidprobe-client.service <<'EOF'
 [Unit]
@@ -302,15 +348,14 @@ show_final_info() {
     echo ""
     echo -e "${YELLOW}Próximos Passos:${NC}"
     echo ""
-    echo "1. Build da imagem Docker:"
-    echo "   cd /opt/voidprobe-client"
-    echo "   docker build -t voidprobe-client:latest -f Dockerfile ."
-    echo ""
-    echo "2. Iniciar o cliente:"
+    echo "1. Iniciar o cliente:"
     echo "   systemctl start voidprobe-client"
     echo "   systemctl enable voidprobe-client"
     echo ""
-    echo "3. Verificar status:"
+    echo "   OU usar docker-compose diretamente:"
+    echo "   cd /opt/voidprobe-client && docker-compose up -d"
+    echo ""
+    echo "2. Verificar status:"
     echo "   systemctl status voidprobe-client"
     echo "   docker logs -f voidprobe-client"
     echo ""
@@ -342,6 +387,8 @@ main() {
     collect_server_info
     configure_client
     create_docker_compose
+    copy_project_files
+    build_docker_image
     create_systemd_service
     test_connectivity
     test_target_service
