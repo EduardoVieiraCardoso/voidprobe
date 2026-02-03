@@ -13,9 +13,10 @@ VoidProbe é uma ferramenta **legítima** de administração remota através de 
 ### 1. **Nunca Reinventar a Roda**
 - **SEMPRE** usar ferramentas, bibliotecas e imagens oficiais prontas
 - **NUNCA** criar implementações customizadas quando existem soluções estabelecidas
-- Preferir imagens Docker oficiais (golang:1.21-alpine, alpine:3.19)
-- Usar ferramentas oficiais do Google para protobuf (protoc-gen-go)
+- Preferir imagens Docker oficiais (golang:1.23-alpine, alpine:3.19)
+- Usar ferramentas oficiais do Google para protobuf (protoc-gen-go@v1.32.0)
 - Utilizar bibliotecas padrão de mercado (gRPC, yamux, protobuf)
+- Para banco de dados embarcado, usar SQLite (modernc.org/sqlite - pure Go, sem CGO)
 
 ### 2. **Simplicidade e Manutenibilidade**
 - Código simples e direto
@@ -81,13 +82,15 @@ voidprobe/
 ## 🔧 Stack Tecnológica
 
 ### Backend
-- **Linguagem**: Go 1.21+
+- **Linguagem**: Go 1.23+
 - **Protocolo**: gRPC com TLS 1.2+
 - **Multiplexação**: Yamux (HashiCorp)
 - **Serialização**: Protocol Buffers v3
+- **Banco de Dados**: SQLite (modernc.org/sqlite)
 
 ### Containerização
-- **Base**: Alpine Linux 3.19
+- **Imagem Build**: golang:1.23-alpine
+- **Imagem Runtime**: alpine:3.19
 - **Build**: Multi-stage Docker builds
 - **Orquestração**: Docker Compose
 - **Init**: Tini (gerenciamento de processos)
@@ -132,12 +135,15 @@ sudo bash setup.sh
 ### Dockerfile - Etapas Críticas
 
 1. **Stage 1: Build**
-   - Usar `golang:1.21-alpine`
+   - Usar `golang:1.23-alpine` (ou versão compatível com dependências)
    - Copiar `go.mod` e `go.sum` PRIMEIRO
    - Executar `go mod tidy -e` (garante go.sum completo)
    - Executar `go mod download && go mod verify`
-   - Gerar código protobuf (se necessário)
+   - Gerar código protobuf com versões fixas:
+     - `protoc-gen-go@v1.32.0`
+     - `protoc-gen-go-grpc@v1.3.0`
    - Build com CGO_ENABLED=0 (binário estático)
+   - **IMPORTANTE**: SQLite modernc.org é pure Go, não precisa de CGO
 
 2. **Stage 2: Runtime**
    - Usar `alpine:3.19`
@@ -158,11 +164,12 @@ sudo bash setup.sh
 - Ou adicionar manualmente as entradas no go.sum
 
 ### 2. Versões Incompatíveis
-**Problema**: `requires go >= 1.23 (running go 1.21)`
+**Problema**: `requires go >= 1.24 (running go 1.23)`
 
 **Solução**:
-- Pinnar versões específicas compatíveis
-- Exemplo: `@v1.32.0` ao invés de `@latest`
+- Atualizar imagem base no Dockerfile: `FROM golang:1.23-alpine` ou superior
+- Atualizar go.mod: `go 1.23`
+- Ou pinnar versões específicas compatíveis: `@v1.32.0` ao invés de `@latest`
 
 ### 3. Imports de Pacotes Internos
 **Problema**: `no required module provides package`
@@ -193,6 +200,12 @@ RUN if [ -d "api/proto" ] && [ -f "api/proto/tunnel.proto" ]; then \
 - Token SHA-256 de 32 bytes (256 bits)
 - Constant-time comparison (previne timing attacks)
 - Token armazenado em `/opt/voidprobe/.env` com permissão 600
+
+### Persistência
+- **SQLite**: Banco de dados embarcado usando `modernc.org/sqlite`
+- Pure Go implementation (sem CGO, binário estático)
+- Ideal para logs, auditoria, configurações
+- Armazenado em volume Docker para persistência
 
 ### Rede
 - Servidor: Escuta em `0.0.0.0:50051` (gRPC)
