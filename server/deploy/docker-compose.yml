@@ -62,6 +62,9 @@ services:
       # Logs (leitura/escrita)
       - ./logs:/logs
 
+      # Banco de dados SQLite
+      - ./data:/opt/voidprobe/data
+
       # Configurações adicionais (opcional)
       - ./config:/config:ro
 
