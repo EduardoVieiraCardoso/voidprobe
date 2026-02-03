@@ -53,6 +53,8 @@ func main() {
 		clientInfo(db, cmdArgs)
 	case "client-key", "ck":
 		clientRegenKey(db, cmdArgs)
+	case "client-set-key", "csk":
+		clientSetKey(db, cmdArgs)
 
 	// Port commands
 	case "port-list", "pl":
@@ -94,7 +96,8 @@ Client Commands:
   client-block, cb <id>              Block client
   client-unblock, cu <id>            Unblock client
   client-info, ci <id>               Show client details
-  client-key, ck <id>                Regenerate client key
+  client-key, ck <id>                Regenerate client key (random)
+  client-set-key, csk <id> <key>     Set specific client key
 
 Port Commands:
   port-list, pl [client_id]          List ports (all or for client)
@@ -299,6 +302,32 @@ func clientRegenKey(db *sql.DB, args []string) {
 	fmt.Printf("AUTH_TOKEN=%s\n", key)
 	fmt.Println()
 	fmt.Println("⚠️  Update the client configuration with the new key.")
+}
+
+func clientSetKey(db *sql.DB, args []string) {
+	if len(args) < 2 {
+		fmt.Fprintln(os.Stderr, "Usage: client-set-key <client_id> <key>")
+		os.Exit(1)
+	}
+
+	clientID := args[0]
+	key := args[1]
+	keyHash := hashKey(key)
+
+	result, err := db.Exec("UPDATE clients SET key_hash = ? WHERE client_id = ?", keyHash, clientID)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	affected, _ := result.RowsAffected()
+	if affected == 0 {
+		fmt.Fprintln(os.Stderr, "Client not found")
+		os.Exit(1)
+	}
+
+	fmt.Println("Key updated!")
+	fmt.Printf("AUTH_TOKEN=%s\n", key)
 }
 
 // ============= Port Commands =============
