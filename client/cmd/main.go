@@ -148,6 +148,18 @@ func connectAndServe(
 	}
 	defer session.Close()
 
+	// Envia client_id no primeiro stream
+	configStream, err := session.Open()
+	if err != nil {
+		return fmt.Errorf("failed to open config stream: %w", err)
+	}
+	_, err = configStream.Write([]byte(cfg.ClientID))
+	if err != nil {
+		configStream.Close()
+		return fmt.Errorf("failed to send client_id: %w", err)
+	}
+	configStream.Close()
+
 	log.Println("Ready to accept connections")
 
 	for {
@@ -160,24 +172,36 @@ func connectAndServe(
 			return fmt.Errorf("session closed: %w", err)
 		}
 
-		log.Println("New admin connection received")
-
-		go handleStream(remoteStream, cfg.TargetService)
+		go handleStream(remoteStream)
 	}
 }
 
-// handleStream conecta ao serviço local e faz o proxy bidirecional.
-func handleStream(remote net.Conn, targetService string) {
+// handleStream lê o destino do header e conecta ao serviço local.
+func handleStream(remote net.Conn) {
 	defer remote.Close()
+
+	// Lê header com destino (formato: host:porta\n)
+	buf := make([]byte, 256)
+	n, err := remote.Read(buf)
+	if err != nil {
+		log.Printf("Failed to read header: %v", err)
+		return
+	}
+
+	// Remove \n do final
+	targetService := string(buf[:n])
+	if len(targetService) > 0 && targetService[len(targetService)-1] == '\n' {
+		targetService = targetService[:len(targetService)-1]
+	}
+
+	log.Printf("New connection -> %s", targetService)
 
 	local, err := net.Dial("tcp", targetService)
 	if err != nil {
-		log.Printf("Failed to connect to target service %s: %v", targetService, err)
+		log.Printf("Failed to connect to %s: %v", targetService, err)
 		return
 	}
 	defer local.Close()
-
-	log.Printf("Proxying connection to %s", targetService)
 
 	done := make(chan struct{}, 2)
 
@@ -195,6 +219,4 @@ func handleStream(remote net.Conn, targetService string) {
 
 	local.SetDeadline(time.Now().Add(1 * time.Second))
 	remote.SetDeadline(time.Now().Add(1 * time.Second))
-
-	log.Println("Connection closed")
 }
