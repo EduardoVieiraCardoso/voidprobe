@@ -101,17 +101,31 @@ Client Commands:
 
 Port Commands:
   port-list, pl [client_id]          List ports (all or for client)
-  port-add, pa <client> <exp> <tgt>  Add port (exposed:target)
+  port-add, pa <client> <exp> <tgt>  Add port (server:client)
   port-remove, pr <id>               Remove port by ID
   port-enable, pe <id>               Enable port
   port-disable, pd <id>              Disable port
 
 Examples:
-  voidprobe-cli client-add my-server-01 "Production Server"
-  voidprobe-cli port-add my-server-01 2222 22
-  voidprobe-cli port-add my-server-01 8080 80
-  voidprobe-cli port-list my-server-01
-  voidprobe-cli client-block my-server-01
+  # Client Management
+  voidprobe-cli client-list                              # List all clients
+  voidprobe-cli client-add srv-prod "Production Server"  # Create new client
+  voidprobe-cli client-info srv-prod                     # Show client details
+  voidprobe-cli client-key srv-prod                      # Generate new random key
+  voidprobe-cli client-set-key srv-prod my-secret-key    # Set specific key
+  voidprobe-cli client-block srv-prod                    # Block client access
+  voidprobe-cli client-unblock srv-prod                  # Unblock client
+  voidprobe-cli client-remove srv-prod                   # Remove client and ports
+
+  # Port Management
+  voidprobe-cli port-list                                # List all ports
+  voidprobe-cli port-list srv-prod                       # List ports for client
+  voidprobe-cli port-add srv-prod 2222 22                # Server:2222 -> Client:22
+  voidprobe-cli port-add srv-prod 8080 80                # Server:8080 -> Client:80
+  voidprobe-cli port-add srv-prod 9000 9000 10.0.0.5     # Server:9000 -> 10.0.0.5:9000
+  voidprobe-cli port-disable 1                           # Disable port ID 1
+  voidprobe-cli port-enable 1                            # Enable port ID 1
+  voidprobe-cli port-remove 1                            # Remove port ID 1
 `
 	fmt.Print(help)
 }
