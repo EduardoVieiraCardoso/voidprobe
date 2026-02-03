@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"strings"
 
@@ -68,6 +69,14 @@ func main() {
 	case "port-disable", "pd":
 		portDisable(db, cmdArgs)
 
+	// Control commands (Unix socket)
+	case "reload", "r":
+		sendControl("RELOAD", cmdArgs)
+	case "connected", "conn":
+		sendControl("LIST", nil)
+	case "kick", "k":
+		sendControl("KICK", cmdArgs)
+
 	// Help
 	case "help", "h":
 		printHelp()
@@ -105,6 +114,11 @@ Port Commands:
   port-remove, pr <id>               Remove port by ID
   port-enable, pe <id>               Enable port
   port-disable, pd <id>              Disable port
+
+Control Commands (hot-reload):
+  reload, r <client_id>              Reload ports for connected client
+  connected, conn                    List connected clients
+  kick, k <client_id>                Disconnect client
 
 Examples:
   # Client Management
@@ -488,4 +502,49 @@ func truncate(s string, max int) string {
 		return s[:max-3] + "..."
 	}
 	return s
+}
+
+// ============= Control Commands =============
+
+const socketPath = "/tmp/voidprobe.sock"
+
+func sendControl(cmd string, args []string) {
+	conn, err := net.Dial("unix", socketPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Server control socket not available\n")
+		fmt.Fprintf(os.Stderr, "Make sure the server is running\n")
+		os.Exit(1)
+	}
+	defer conn.Close()
+
+	// Envia comando
+	message := cmd
+	if len(args) > 0 {
+		message += " " + args[0]
+	}
+	message += "\n"
+
+	conn.Write([]byte(message))
+
+	// Lê resposta
+	buf := make([]byte, 4096)
+	n, _ := conn.Read(buf)
+	response := string(buf[:n])
+
+	// Exibe resposta
+	lines := strings.Split(strings.TrimSpace(response), "\n")
+	for _, line := range lines {
+		if line == "OK" {
+			if cmd == "RELOAD" {
+				fmt.Println("Ports reloaded successfully")
+			} else if cmd == "KICK" {
+				fmt.Println("Client disconnected")
+			}
+		} else if strings.HasPrefix(line, "ERROR:") {
+			fmt.Fprintln(os.Stderr, line)
+			os.Exit(1)
+		} else if line != "" {
+			fmt.Println(line)
+		}
+	}
 }
