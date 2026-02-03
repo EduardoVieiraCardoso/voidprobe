@@ -56,8 +56,16 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
     -o /server \
     ./cmd
 
-# Verificar se o binário foi criado corretamente
-RUN test -f /server && chmod +x /server
+# Build da CLI
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build \
+    -ldflags="-s -w" \
+    -trimpath \
+    -o /voidprobe-cli \
+    ./cmd/cli
+
+# Verificar se os binários foram criados corretamente
+RUN test -f /server && chmod +x /server && test -f /voidprobe-cli && chmod +x /voidprobe-cli
 
 # ==============================================================================
 # Runtime Stage
@@ -84,8 +92,9 @@ RUN addgroup -g 1000 voidprobe && \
 
 WORKDIR /app
 
-# Copiar binário do stage de build
+# Copiar binários do stage de build
 COPY --from=builder /server /app/server
+COPY --from=builder /voidprobe-cli /usr/local/bin/voidprobe-cli
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 # Mudar para usuário não-privilegiado
