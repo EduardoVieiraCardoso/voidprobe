@@ -24,8 +24,8 @@ import (
 
 // main inicializa o cliente, conecta ao servidor e aguarda conexões de admin.
 func main() {
-	log.Println("=== VoidProbe Client ===")
-	log.Println("Remote Administration Client")
+	log.Println("=== VoidProbe Client CDN ===")
+	log.Println("Remote Administration Client (CDN Mode)")
 	log.Println("Version: 1.0.0")
 	log.Println("")
 
@@ -44,15 +44,14 @@ func main() {
 	// Configura autenticação
 	authInterceptor := security.NewClientAuthInterceptor(cfg.AuthToken)
 
-	// Configura TLS
+	// Configura TLS (CDN usa certificados válidos)
 	var creds credentials.TransportCredentials
 	if tlsCfg.Enabled {
 		config := &tls.Config{
-			InsecureSkipVerify: true,
-			MinVersion:         tls.VersionTLS12,
+			MinVersion: tls.VersionTLS12,
 		}
 		creds = credentials.NewTLS(config)
-		log.Println("TLS enabled")
+		log.Println("TLS enabled (CDN mode - valid certificates)")
 	} else {
 		creds = insecure.NewCredentials()
 		log.Println("Warning: Running in insecure mode")

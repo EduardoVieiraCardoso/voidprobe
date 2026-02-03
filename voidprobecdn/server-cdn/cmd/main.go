@@ -32,8 +32,8 @@ type server struct {
 }
 
 func main() {
-	log.Println("=== VoidProbe Server ===")
-	log.Println("Remote Administration Server")
+	log.Println("=== VoidProbe Server CDN ===")
+	log.Println("Remote Administration Server (CDN Mode)")
 	log.Println("Version: 1.0.0")
 	log.Println("")
 
