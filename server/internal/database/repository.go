@@ -105,6 +105,24 @@ func (r *Repository) ValidateClient(clientID, key string) (*Client, error) {
 	return client, nil
 }
 
+// ValidateClientByID valida cliente apenas pelo ID (para conexões já autenticadas)
+func (r *Repository) ValidateClientByID(clientID string) (*Client, error) {
+	client, err := r.GetClient(clientID)
+	if err != nil {
+		return nil, err
+	}
+
+	if client == nil {
+		return nil, fmt.Errorf("client not found: %s", clientID)
+	}
+
+	if client.Status != "active" {
+		return nil, fmt.Errorf("client blocked: %s", clientID)
+	}
+
+	return client, nil
+}
+
 // UpdateLastSeen atualiza timestamp de última conexão
 func (r *Repository) UpdateLastSeen(clientID string) error {
 	_, err := r.db.Exec(`

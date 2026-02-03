@@ -112,7 +112,7 @@ func main() {
 	}
 }
 
-// TunnelStream implementa o serviço de túnel e expõe a porta de administração.
+// TunnelStream implementa o serviço de túnel e expõe múltiplas portas do banco.
 func (s *server) TunnelStream(stream pb.RemoteTunnel_TunnelStreamServer) error {
 	log.Println("New client connected")
 
@@ -135,47 +135,125 @@ func (s *server) TunnelStream(stream pb.RemoteTunnel_TunnelStreamServer) error {
 
 	log.Println("Yamux session established")
 
-	// Listener local para administradores
-	localPort := "0.0.0.0:2222"
-	listener, err := net.Listen("tcp", localPort)
+	// Recebe primeiro stream com client_id
+	configStream, err := session.Accept()
 	if err != nil {
-		log.Printf("Failed to create local listener: %v", err)
+		log.Printf("Failed to accept config stream: %v", err)
 		return err
 	}
-	defer listener.Close()
 
-	log.Printf("Admin port available at %s", localPort)
+	buf := make([]byte, 256)
+	n, err := configStream.Read(buf)
+	if err != nil {
+		log.Printf("Failed to read client_id: %v", err)
+		configStream.Close()
+		return err
+	}
+	configStream.Close()
 
-	errChan := make(chan error, 1)
+	clientID := string(buf[:n])
+	log.Printf("Client identified: %s", clientID)
 
-	go func() {
-		for {
-			adminConn, err := listener.Accept()
-			if err != nil {
-				errChan <- err
-				return
-			}
+	// Valida cliente no banco
+	client, err := s.repo.ValidateClientByID(clientID)
+	if err != nil {
+		log.Printf("Client validation failed: %v", err)
+		return err
+	}
 
-			log.Println("Administrator connected")
+	// Atualiza last_seen
+	s.repo.UpdateLastSeen(clientID)
 
-			remoteConn, err := session.Open()
-			if err != nil {
-				log.Printf("Failed to open remote stream: %v", err)
-				adminConn.Close()
-				continue
-			}
+	// Busca portas configuradas
+	ports, err := s.repo.GetClientPorts(clientID)
+	if err != nil {
+		log.Printf("Failed to get client ports: %v", err)
+		return err
+	}
 
-			go proxyConnection(adminConn, remoteConn)
+	if len(ports) == 0 {
+		log.Printf("No ports configured for client %s", clientID)
+		return nil
+	}
+
+	log.Printf("Client %s (%s) connected, %d ports configured", clientID, client.ClientName, len(ports))
+
+	// Cria listeners para cada porta
+	var listeners []net.Listener
+	defer func() {
+		for _, l := range listeners {
+			l.Close()
 		}
 	}()
 
-	select {
-	case err := <-errChan:
-		return err
-	case <-stream.Context().Done():
-		log.Println("Client disconnected")
-		return stream.Context().Err()
+	ctx, cancel := context.WithCancel(stream.Context())
+	defer cancel()
+
+	for _, port := range ports {
+		addr := "0.0.0.0:" + string(rune(port.ExposedPort))
+		// Corrigir: usar fmt.Sprintf
+		addr = "0.0.0.0:" + itoa(port.ExposedPort)
+		listener, err := net.Listen("tcp", addr)
+		if err != nil {
+			log.Printf("Failed to listen on port %d: %v", port.ExposedPort, err)
+			continue
+		}
+		listeners = append(listeners, listener)
+		log.Printf("Listening on port %d -> %s:%d", port.ExposedPort, port.TargetHost, port.TargetPort)
+
+		// Goroutine para aceitar conexões nesta porta
+		go func(l net.Listener, p database.PortMapping) {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+
+				conn, err := l.Accept()
+				if err != nil {
+					if ctx.Err() != nil {
+						return
+					}
+					continue
+				}
+
+				log.Printf("Connection on port %d", p.ExposedPort)
+
+				// Abre stream para o cliente
+				remoteConn, err := session.Open()
+				if err != nil {
+					log.Printf("Failed to open stream: %v", err)
+					conn.Close()
+					continue
+				}
+
+				// Envia header com destino
+				header := p.TargetHost + ":" + itoa(p.TargetPort) + "\n"
+				remoteConn.Write([]byte(header))
+
+				go proxyConnection(conn, remoteConn)
+			}
+		}(listener, port)
 	}
+
+	// Aguarda desconexão
+	<-stream.Context().Done()
+	log.Println("Client disconnected")
+	return stream.Context().Err()
+}
+
+// itoa converte int para string
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	var s string
+	for n > 0 {
+		s = string(rune('0'+n%10)) + s
+		n /= 10
+	}
+	return s
 }
 
 // HealthCheck implementa verificação de status.
