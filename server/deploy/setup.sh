@@ -179,6 +179,13 @@ generate_auth_token() {
 
     CONFIG_DIR="/opt/voidprobe"
     mkdir -p $CONFIG_DIR
+    mkdir -p $CONFIG_DIR/data
+    mkdir -p $CONFIG_DIR/logs
+    mkdir -p $CONFIG_DIR/config
+    
+    # Permissões para usuário do container (UID 1000)
+    chown -R 1000:1000 $CONFIG_DIR/data
+    chown -R 1000:1000 $CONFIG_DIR/logs
 
     # Gera token seguro de 32 bytes
     AUTH_TOKEN=$(openssl rand -hex 32)
