@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package tunnel;
+
+option go_package = "github.com/voidprobe/client-cdn/api/proto";
+
+// RemoteTunnel - Serviço de túnel seguro para administração remota
+service RemoteTunnel {
+  // Handshake autentica cliente e retorna configuração de portas
+  rpc Handshake(ClientHandshake) returns (ServerHandshake);
+
+  // TunnelStream estabelece um túnel bidirecional multiplexado
+  rpc TunnelStream(stream Chunk) returns (stream Chunk);
+
+  // HealthCheck verifica o status da conexão
+  rpc HealthCheck(HealthRequest) returns (HealthResponse);
+}
+
+// ClientHandshake enviado pelo cliente para autenticação
+message ClientHandshake {
+  string client_id = 1;
+  string key = 2;
+}
+
+// PortMapping define mapeamento de porta
+message PortMapping {
+  int32 exposed_port = 1;   // porta no servidor
+  string target_host = 2;   // host no cliente
+  int32 target_port = 3;    // porta no cliente
+}
+
+// ServerHandshake resposta do servidor com configuração
+message ServerHandshake {
+  bool accepted = 1;
+  string message = 2;
+  repeated PortMapping ports = 3;
+}
+
+// Chunk representa um pacote de dados no túnel
+message Chunk {
+  bytes data = 1;
+  int32 port = 2;  // porta de destino para roteamento
+}
+
+// HealthRequest para verificação de status
+message HealthRequest {
+  string client_id = 1;
+}
+
+// HealthResponse retorna informações do cliente
+message HealthResponse {
+  string status = 1;
+  string version = 2;
+  int64 uptime_seconds = 3;
+}

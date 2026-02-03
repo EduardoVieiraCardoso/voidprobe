@@ -1,0 +1,19 @@
+# VoidProbe Client CDN - Docker Compose
+
+services:
+  client:
+    build:
+      context: ../
+      dockerfile: deploy/Dockerfile
+    image: voidprobe-client-cdn:latest
+    container_name: voidprobe-client-cdn
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/logs
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
