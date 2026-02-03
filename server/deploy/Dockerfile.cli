@@ -1,0 +1,26 @@
+# Build stage
+FROM golang:1.23-alpine AS builder
+
+WORKDIR /build
+
+# Install dependencies
+RUN apk add --no-cache git
+
+# Copy module files
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source
+COPY . .
+
+# Build CLI
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o voidprobe-cli ./cmd/cli
+
+# Runtime stage
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates sqlite
+
+COPY --from=builder /build/voidprobe-cli /usr/local/bin/
+
+ENTRYPOINT ["voidprobe-cli"]
