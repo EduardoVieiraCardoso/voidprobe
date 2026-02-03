@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -15,7 +16,7 @@ import (
 	"github.com/hashicorp/yamux"
 	pb "github.com/voidprobe/server/api/proto"
 	"github.com/voidprobe/server/internal/config"
-	"github.com/voidprobe/server/internal/security"
+	"github.com/voidprobe/server/internal/database"
 	"github.com/voidprobe/server/internal/transport"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -27,6 +28,7 @@ type server struct {
 	pb.UnimplementedRemoteTunnelServer
 	sessions sync.Map
 	config   *config.ServerConfig
+	repo     *database.Repository
 }
 
 // main inicializa o servidor gRPC e aguarda conexões de clientes autenticados.
@@ -40,16 +42,16 @@ func main() {
 	cfg := config.LoadServerConfig()
 	tlsCfg := config.LoadTLSConfig()
 
-	// Configura autenticação
-	validTokens := []string{
-		os.Getenv("AUTH_TOKEN"),
+	// Inicializa banco de dados
+	dbCfg := database.DefaultConfig()
+	if err := database.Init(dbCfg); err != nil {
+		log.Fatalf("Failed to initialize database: %v", err)
 	}
-	if validTokens[0] == "" {
-		log.Fatal("AUTH_TOKEN environment variable is required")
-	}
+	defer database.Close()
 
-	validator := security.NewTokenValidator(validTokens)
+	repo := database.NewRepository()
 
+	// Configura TLS
 	// Configura TLS
 	var creds credentials.TransportCredentials
 	if tlsCfg.Enabled {
@@ -68,19 +70,17 @@ func main() {
 		}
 	}
 
-	// Configura servidor gRPC
+	// Configura servidor gRPC (sem auth interceptor - autenticação via Handshake)
 	var opts []grpc.ServerOption
 	if creds != nil {
 		opts = append(opts, grpc.Creds(creds))
 	}
 
-	opts = append(opts,
-		grpc.UnaryInterceptor(validator.UnaryInterceptor()),
-		grpc.StreamInterceptor(validator.StreamInterceptor()),
-	)
-
 	grpcServer := grpc.NewServer(opts...)
-	tunnelServer := &server{config: cfg}
+	tunnelServer := &server{
+		config: cfg,
+		repo:   repo,
+	}
 
 	pb.RegisterRemoteTunnelServer(grpcServer, tunnelServer)
 	reflection.Register(grpcServer)
