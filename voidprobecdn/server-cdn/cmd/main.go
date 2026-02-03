@@ -1,45 +1,41 @@
 package main
 
 import (
-	"context"
-	"crypto/tls"
+	"crypto/sha256"
+	"encoding/hex"
+	"io"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/hashicorp/yamux"
-	pb "github.com/voidprobe/server-cdn/api/proto"
 	"github.com/voidprobe/server-cdn/internal/config"
 	"github.com/voidprobe/server-cdn/internal/database"
 	"github.com/voidprobe/server-cdn/internal/session"
-	"github.com/voidprobe/server-cdn/internal/transport"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/reflection"
 )
 
-// sessionManager global para acesso do controller
 var sessionManager *session.Manager
+var repo *database.Repository
 
-// server implementa o serviço gRPC
-type server struct {
-	pb.UnimplementedRemoteTunnelServer
-	config *config.ServerConfig
-	repo   *database.Repository
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  32 * 1024,
+	WriteBufferSize: 32 * 1024,
+	CheckOrigin:     func(r *http.Request) bool { return true },
 }
 
 func main() {
-	log.Println("=== VoidProbe Server CDN ===")
-	log.Println("Remote Administration Server (CDN Mode)")
+	log.Println("=== VoidProbe Server CDN (WebSocket) ===")
+	log.Println("Remote Administration Server")
 	log.Println("Version: 1.0.0")
 	log.Println("")
 
 	// Carrega configurações
 	cfg := config.LoadServerConfig()
-	tlsCfg := config.LoadTLSConfig()
 
 	// Inicializa banco de dados
 	dbCfg := database.DefaultConfig()
@@ -48,7 +44,7 @@ func main() {
 	}
 	defer database.Close()
 
-	repo := database.NewRepository()
+	repo = database.NewRepository()
 
 	// Inicializa session manager
 	sessionManager = session.NewManager(repo)
@@ -60,142 +56,167 @@ func main() {
 	}
 	defer controller.Stop()
 
-	// Configura TLS
-	var creds credentials.TransportCredentials
-	if tlsCfg.Enabled {
-		cert, err := tls.LoadX509KeyPair(tlsCfg.CertFile, tlsCfg.KeyFile)
-		if err != nil {
-			log.Printf("Warning: Failed to load TLS certificates: %v", err)
-			log.Println("Running in insecure mode (not recommended for production)")
-			creds = nil
-		} else {
-			config := &tls.Config{
-				Certificates: []tls.Certificate{cert},
-				MinVersion:   tls.VersionTLS12,
-			}
-			creds = credentials.NewTLS(config)
-			log.Println("TLS enabled")
-		}
-	}
+	// HTTP handlers
+	http.HandleFunc("/tunnel", handleTunnel)
+	http.HandleFunc("/health", handleHealth)
 
-	// Configura servidor gRPC
-	var opts []grpc.ServerOption
-	if creds != nil {
-		opts = append(opts, grpc.Creds(creds))
-	}
-
-	grpcServer := grpc.NewServer(opts...)
-	tunnelServer := &server{
-		config: cfg,
-		repo:   repo,
-	}
-
-	pb.RegisterRemoteTunnelServer(grpcServer, tunnelServer)
-	reflection.Register(grpcServer)
-
-	// Inicia listener
-	address := net.JoinHostPort(cfg.Address, cfg.Port)
-	listener, err := net.Listen("tcp", address)
-	if err != nil {
-		log.Fatalf("Failed to listen on %s: %v", address, err)
-	}
-
+	// Inicia servidor HTTP
+	address := cfg.Address + ":" + cfg.Port
 	log.Printf("Server listening on %s", address)
-	log.Println("Waiting for authorized clients...")
+	log.Println("Waiting for WebSocket connections...")
 
 	// Graceful shutdown
 	go func() {
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 		<-sigChan
-
 		log.Println("\nShutting down server...")
-		grpcServer.GracefulStop()
-		log.Println("Server stopped")
 		os.Exit(0)
 	}()
 
-	// Inicia servidor
-	if err := grpcServer.Serve(listener); err != nil {
+	if err := http.ListenAndServe(address, nil); err != nil {
 		log.Fatalf("Failed to serve: %v", err)
 	}
 }
 
-// TunnelStream implementa o serviço de túnel com hot-reload
-func (s *server) TunnelStream(stream pb.RemoteTunnel_TunnelStreamServer) error {
-	log.Println("New client connected")
+// handleTunnel processa conexões WebSocket de clientes
+func handleTunnel(w http.ResponseWriter, r *http.Request) {
+	// Autenticação via header
+	clientID := r.Header.Get("X-Client-ID")
+	authToken := r.Header.Get("X-Auth-Token")
 
-	adapter := transport.NewAdapter(stream)
+	if clientID == "" || authToken == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Valida cliente
+	client, err := repo.ValidateClient(clientID, hashKey(authToken))
+	if err != nil {
+		log.Printf("Auth failed for %s: %v", clientID, err)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Upgrade para WebSocket
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("WebSocket upgrade failed: %v", err)
+		return
+	}
+
+	log.Printf("Client %s (%s) connected via WebSocket", clientID, client.ClientName)
+
+	// Atualiza last_seen
+	repo.UpdateLastSeen(clientID)
+
+	// Adapta WebSocket para net.Conn
+	wsConn := NewWSConn(conn)
 
 	// Configuração yamux
 	yamuxConfig := yamux.DefaultConfig()
 	yamuxConfig.EnableKeepAlive = true
-	yamuxConfig.KeepAliveInterval = 60 * time.Second
-	yamuxConfig.ConnectionWriteTimeout = 60 * time.Second
+	yamuxConfig.KeepAliveInterval = 30 * time.Second
+	yamuxConfig.ConnectionWriteTimeout = 30 * time.Second
 	yamuxConfig.StreamCloseTimeout = 5 * time.Minute
-	yamuxConfig.StreamOpenTimeout = 60 * time.Second
 
-	yamuxSession, err := yamux.Server(adapter, yamuxConfig)
+	yamuxSession, err := yamux.Server(wsConn, yamuxConfig)
 	if err != nil {
 		log.Printf("Failed to create yamux session: %v", err)
-		return err
+		conn.Close()
+		return
 	}
-	defer yamuxSession.Close()
 
 	log.Println("Yamux session established")
 
-	// Recebe client_id no primeiro stream
-	configStream, err := yamuxSession.Accept()
-	if err != nil {
-		log.Printf("Failed to accept config stream: %v", err)
-		return err
-	}
-
-	buf := make([]byte, 256)
-	n, err := configStream.Read(buf)
-	if err != nil {
-		log.Printf("Failed to read client_id: %v", err)
-		configStream.Close()
-		return err
-	}
-	configStream.Close()
-
-	clientID := string(buf[:n])
-	log.Printf("Client identified: %s", clientID)
-
-	// Valida cliente
-	client, err := s.repo.ValidateClientByID(clientID)
-	if err != nil {
-		log.Printf("Client validation failed: %v", err)
-		return err
-	}
-
-	// Atualiza last_seen
-	s.repo.UpdateLastSeen(clientID)
-
-	log.Printf("Client %s (%s) connected", clientID, client.ClientName)
-
-	// Registra sessão no manager
+	// Registra sessão
 	cs := sessionManager.RegisterSession(clientID, yamuxSession)
 	defer sessionManager.UnregisterSession(clientID)
 
-	// Carrega portas iniciais
+	// Carrega portas
 	if err := cs.Reload(); err != nil {
 		log.Printf("Failed to load ports: %v", err)
-		return err
+		return
 	}
 
 	// Aguarda desconexão
-	<-stream.Context().Done()
-	log.Println("Client disconnected")
-	return stream.Context().Err()
+	<-yamuxSession.CloseChan()
+	log.Printf("Client %s disconnected", clientID)
 }
 
-// HealthCheck implementa verificação de status
-func (s *server) HealthCheck(ctx context.Context, req *pb.HealthRequest) (*pb.HealthResponse, error) {
-	return &pb.HealthResponse{
-		Status:        "healthy",
-		Version:       "1.0.0",
-		UptimeSeconds: 0,
-	}, nil
+// handleHealth endpoint de health check
+func handleHealth(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"status":"healthy","version":"1.0.0"}`))
+}
+
+func hashKey(key string) string {
+	h := sha256.Sum256([]byte(key))
+	return hex.EncodeToString(h[:])
+}
+
+// WSConn adapta websocket.Conn para net.Conn
+type WSConn struct {
+	conn   *websocket.Conn
+	reader io.Reader
+}
+
+func NewWSConn(conn *websocket.Conn) *WSConn {
+	return &WSConn{conn: conn}
+}
+
+func (w *WSConn) Read(p []byte) (int, error) {
+	for {
+		if w.reader == nil {
+			_, reader, err := w.conn.NextReader()
+			if err != nil {
+				return 0, err
+			}
+			w.reader = reader
+		}
+
+		n, err := w.reader.Read(p)
+		if err == io.EOF {
+			w.reader = nil
+			if n > 0 {
+				return n, nil
+			}
+			continue
+		}
+		return n, err
+	}
+}
+
+func (w *WSConn) Write(p []byte) (int, error) {
+	err := w.conn.WriteMessage(websocket.BinaryMessage, p)
+	if err != nil {
+		return 0, err
+	}
+	return len(p), nil
+}
+
+func (w *WSConn) Close() error {
+	return w.conn.Close()
+}
+
+func (w *WSConn) LocalAddr() net.Addr {
+	return w.conn.LocalAddr()
+}
+
+func (w *WSConn) RemoteAddr() net.Addr {
+	return w.conn.RemoteAddr()
+}
+
+func (w *WSConn) SetDeadline(t time.Time) error {
+	w.conn.SetReadDeadline(t)
+	w.conn.SetWriteDeadline(t)
+	return nil
+}
+
+func (w *WSConn) SetReadDeadline(t time.Time) error {
+	return w.conn.SetReadDeadline(t)
+}
+
+func (w *WSConn) SetWriteDeadline(t time.Time) error {
+	return w.conn.SetWriteDeadline(t)
 }

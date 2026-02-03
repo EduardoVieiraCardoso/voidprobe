@@ -30,6 +30,7 @@ type ClientConfig struct {
 	TargetService  string
 	ReconnectDelay time.Duration
 	MaxRetries     int
+	TLSEnabled     bool
 	Version        string
 }
 
@@ -54,12 +55,13 @@ func LoadServerConfig() *ServerConfig {
 // LoadClientConfig carrega configurações do cliente a partir do ambiente.
 func LoadClientConfig() *ClientConfig {
 	return &ClientConfig{
-		ServerAddress:  getEnv("SERVER_ADDRESS", "localhost:50051"),
+		ServerAddress:  getEnv("SERVER_ADDRESS", "localhost:443"),
 		ClientID:       getEnv("CLIENT_ID", "client-001"),
 		AuthToken:      getEnv("AUTH_TOKEN", ""),
 		TargetService:  getEnv("TARGET_SERVICE", "localhost:22"),
 		ReconnectDelay: getDurationEnv("RECONNECT_DELAY", 5*time.Second),
 		MaxRetries:     getIntEnv("MAX_RETRIES", 10),
+		TLSEnabled:     getBoolEnv("TLS_ENABLED", true),
 		Version:        "1.0.0",
 	}
 }
