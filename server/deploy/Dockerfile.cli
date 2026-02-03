@@ -13,8 +13,8 @@ RUN go mod download
 # Copy source
 COPY . .
 
-# Build CLI
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o voidprobe-cli ./cmd/cli
+# Update dependencies and build CLI
+RUN go mod tidy && CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o voidprobe-cli ./cmd/cli
 
 # Runtime stage
 FROM alpine:3.19
